@@ -7,7 +7,7 @@
 **Місце розташування:**
 
 - **GitHub:** [https://github.com/3POSENJOYER/IA-34_appRECORD-YereskoIllia-FIOT-2026-Public](https://github.com/3POSENJOYER/IA-34_appRECORD-YereskoIllia-FIOT-2026-Public)
-- **Live demo:** [встав посилання на Vercel/Netlify]
+- **Live demo:** [https://3posenjoyer.github.io/IA-34_appRECORD-YereskoIllia-FIOT-2026-Public/](https://3posenjoyer.github.io/IA-34_appRECORD-YereskoIllia-FIOT-2026-Public/)
 
 ---
 
