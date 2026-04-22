@@ -13,7 +13,9 @@ const config = {
   ],
   kit: {
     adapter: adapter({ fallback: "404.html" }),
-    prerender: { entries: ["*"] },
+    prerender: {
+      entries: ["/", "/about", "/lab/lab-1.1", "/lab/lab-1.2"],
+    },
     paths: {
       base: BASE_PATH,
     },
