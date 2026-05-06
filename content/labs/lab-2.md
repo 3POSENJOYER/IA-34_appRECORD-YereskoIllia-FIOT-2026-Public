@@ -41,7 +41,7 @@
 ### Нефункціональні вимоги
 
 - **NFR-1:** Дизайн у стилі Gaming UI (темна тема, неонові акценти).
-- **NFR-2:** Адаптивність (Desktop 1200px+, Tablet 768px+, Mobile < 768px).
+- **NFR-2:** Адаптивність (Desktop 1200px+, Tablet 768px+, Mobile &lt; 768px).
 - **NFR-3:** Продуктивність: час ініціалізації додатку до 1.0 сек.
 - **NFR-4:** Плавні CSS-анімації (transition, hover effects).
 - **NFR-5:** Масштабованість для додавання нових платформ (Ubisoft, Battle.net).
@@ -58,7 +58,6 @@
 - **pnpm:** менеджер пакетів, що оптимізує використання дискового простору.
 - **GitHub Actions:** інструмент для автоматизації CI/CD процесів.
 
-
 ## Виконання завдання
 
 У межах лабораторної роботи було реалізовано backend-частину вебзастосунку **MacShnaknels** з підключенням до бази даних MySQL.
@@ -73,7 +72,7 @@ services:
     image: mysql:8.0
     environment:
       MYSQL_ROOT_PASSWORD: password
-      MYSQL_DATABASE: web_backend_lab  # Назва БД
+      MYSQL_DATABASE: web_backend_lab # Назва БД
       MYSQL_USER: user
       MYSQL_PASSWORD: pass
     ports:
@@ -158,15 +157,15 @@ async remove(id: number): Promise<void> {
 
 ```ts
 // backend/config/database.ts
-import { Sequelize } from 'sequelize';
+import { Sequelize } from "sequelize";
 
 export const sequelize = new Sequelize(
-  process.env.DB_NAME || 'web_backend_lab',
-  process.env.DB_USER || 'root',
-  process.env.DB_PASSWORD || 'password',
+  process.env.DB_NAME || "web_backend_lab",
+  process.env.DB_USER || "root",
+  process.env.DB_PASSWORD || "password",
   {
-    host: process.env.DB_HOST || 'localhost',
-    dialect: 'mysql',  // Використовує mysql2 драйвер
+    host: process.env.DB_HOST || "localhost",
+    dialect: "mysql", // Використовує mysql2 драйвер
   },
 );
 ```
