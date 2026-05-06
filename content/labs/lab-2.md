@@ -102,11 +102,112 @@ async onModuleInit() {
 ```
 
 ### 3. Виконання SQL-запитів (SELECT, INSERT, UPDATE, DELETE)
+## Завдання 2-3: Створення таблиць та SQL-запити
 
+### Структура таблиць
+
+Таблиці створюються автоматично через Sequelize ORM при старті NestJS додатку.
+
+#### Таблиця: `users` (користувачі)
+
+```sql
+CREATE TABLE `users` (
+  `id` INTEGER auto_increment PRIMARY KEY,
+  `name` VARCHAR(255) NOT NULL,
+  `email` VARCHAR(255) NOT NULL UNIQUE,
+  `password` VARCHAR(255) NOT NULL,
+  `createdAt` DATETIME NOT NULL,
+  `updatedAt` DATETIME NOT NULL
+) ENGINE=InnoDB;
+```
+
+**Призначення:**
+
+- Зберігання облікових даних користувачів
+- `id` - унікальний ідентифікатор
+- `email` - унікальна адреса для входу
+- `password` - захищений (хешований через bcryptjs) пароль
+
+#### Таблиця: `posts` (дописи)
+
+```sql
+CREATE TABLE `posts` (
+  `id` INTEGER auto_increment PRIMARY KEY,
+  `title` VARCHAR(255) NOT NULL,
+  `content` TEXT NOT NULL,
+  `userId` INTEGER NOT NULL,
+  `createdAt` DATETIME NOT NULL,
+  `updatedAt` DATETIME NOT NULL,
+  FOREIGN KEY (`userId`) REFERENCES `users` (`id`)
+    ON DELETE NO ACTION
+    ON UPDATE CASCADE
+) ENGINE=InnoDB;
+```
+
+**Призначення:**
+
+- Зберігання постів від користувачів
+- `userId` - зв'язок з таблицею `users` (One-to-Many)
+- Гарантує, що кожен пост належить лише одному користувачу
+
+#### Таблиця: `games` (ігри)
+
+```sql
+CREATE TABLE `games` (
+  `id` INTEGER auto_increment PRIMARY KEY,
+  `title` VARCHAR(255) NOT NULL,
+  `platform` ENUM('Steam', 'Epic', 'GOG') NOT NULL,
+  `performanceScore` INTEGER NOT NULL,
+  `expectedFps` INTEGER NOT NULL,
+  `cover` VARCHAR(255) NOT NULL,
+  `createdAt` DATETIME NOT NULL,
+  `updatedAt` DATETIME NOT NULL
+) ENGINE=InnoDB;
+```
+
+**Призначення:**
+
+- Каталог доступних ігор
+- `platform` - платформа розповсюдження (Steam, Epic, GOG)
+- `performanceScore` - оцінка продуктивності (0-100)
+- `expectedFps` - очікувана частота кадрів (frames per second)
+
+#### Таблиця: `hardware_profiles` (профілі заліза)
+
+```sql
+CREATE TABLE `hardware_profiles` (
+  `id` INTEGER auto_increment PRIMARY KEY,
+  `cpu` VARCHAR(255) NOT NULL,
+  `gpu` VARCHAR(255) NOT NULL,
+  `ram` INTEGER NOT NULL,
+  `vram` INTEGER NOT NULL,
+  `resolution` VARCHAR(255) NOT NULL,
+  `userId` INTEGER NOT NULL,
+  `createdAt` DATETIME NOT NULL,
+  `updatedAt` DATETIME NOT NULL,
+  FOREIGN KEY (`userId`) REFERENCES `users` (`id`)
+    ON DELETE NO ACTION
+    ON UPDATE CASCADE
+) ENGINE=InnoDB;
+```
+
+**Призначення:**
+
+- Зберігання конфігурації комп'ютера користувача
+- Для розрахунку прогнозів FPS
 #### SELECT
 
 ```sql
-SELECT id, name, email, role FROM users;
+// backend/controllers/games.controller.ts
+@Get()
+async findAll(): Promise<Game[]> {
+  return this.gamesService.findAll();
+}
+
+// backend/services/games.service.ts
+async findAll(): Promise<Game[]> {
+  return (Game as any).findAll();
+}
 ```
 
 #### INSERT
@@ -265,6 +366,24 @@ export class Post extends Model<PostAttributes, PostCreationAttributes> {
 - аналогічні зв'язки для `User ↔ HardwareProfile` (One-to-One).
 
 ---
+## Завдання 8: Реалізація зв'язку One-to-Many
+
+```typescript
+@Injectable()
+export class AppService implements OnModuleInit {
+  async onModuleInit() {
+    (User as any).hasMany(Post, { foreignKey: "userId" });
+    (Post as any).belongsTo(User, { foreignKey: "userId" });
+
+    (User as any).hasOne(HardwareProfile, { foreignKey: "userId" });
+    (HardwareProfile as any).belongsTo(User, { foreignKey: "userId" });
+
+    await sequelize.sync({ force: true });
+
+    await this.createInitialGames();
+  }
+}
+```
 
 ## Висновки
 
