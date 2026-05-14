@@ -8,7 +8,6 @@
 
 ## 1. Створити REST API на Node.js та Express
 
-У проєкті реалізовано REST API у `backend` за допомогою NestJS, який працює поверх Express.
 
 Файли:
 
@@ -181,7 +180,6 @@ export class AppModule {}
   - `backend/dto/update-password.dto.ts`
   - `backend/dto/update-profile.dto.ts`
 
-Це означає, що об'єкти запитів проходять перевірку на наявність полів, формат email, довжину та правила пароля.
 
 **Код з `backend/main.ts`:**
 
@@ -343,7 +341,6 @@ export class GamesController {
 
 ## 5. Провести тестування API
 
-Тестування реалізовано у:
 
 - `backend/test/app.e2e-spec.ts`
 

@@ -26,7 +26,7 @@
 Впровадження такої системи дозволяє геймерам уникати помилок при виборі контенту, забезпечуючи прозорий механізм прогнозування частоти кадрів та загальної стабільності ігрового процесу на основі реальних характеристик заліза.
 
 ---
-1. **Встановити необхідні бібліотеки**
+**Встановити необхідні бібліотеки**
    - Файл: `backend/package.json`
    - Використано пакети: `@nestjs/jwt`, `passport`, `passport-jwt`, `@nestjs/passport`, `bcryptjs`, `class-validator`, `@nestjs/throttler`, `nodemailer`, `sequelize`, `sequelize-typescript`, `mysql2`, `sqlite3`.
 
@@ -48,7 +48,7 @@
    }
    ```
 
-2. **Реалізувати реєстрацію та авторизацію користувача**
+**Реалізувати реєстрацію та авторизацію користувача**
    - Контролер: `backend/controllers/auth.controller.ts` (`POST /auth/register`, `POST /auth/login`)
    - Сервіс: `backend/services/auth.service.ts` (`register()`, `login()`)
 
@@ -86,7 +86,7 @@
    }
    ```
 
-3. **Додати валідацію даних, обробку помилок**
+**Додати валідацію даних, обробку помилок**
    - DTO: `backend/dto/register.dto.ts`, `backend/dto/login.dto.ts`, `backend/dto/update-password.dto.ts`, `backend/dto/update-profile.dto.ts`
    - Обробка помилок у контролері: `try/catch` в `backend/controllers/auth.controller.ts` та викидання `HttpException`, `UnauthorizedException`, `BadRequestException` у `backend/services/auth.service.ts`
 
@@ -121,7 +121,7 @@
    }
    ```
 
-4. **Реалізувати захищений маршрут**
+ **Реалізувати захищений маршрут**
    - Гард: `backend/guards/jwt-auth.guard.ts`
    - Захищені ендпоінти: `GET /auth/profile`, `PUT /auth/profile`, `PUT /auth/change-password`, `DELETE /auth/user`, `POST /auth/logout`, `GET /auth/admin/users`
 
@@ -143,13 +143,8 @@
    }
    ```
 
-5. **Протестувати API через Postman або curl**
-   - Це процесна дія поза кодом, але всі відповідні API-ендпоінти доступні в `backend/controllers/auth.controller.ts`.
 
-6. **Проаналізувати отримані результати**
-   - Аналіз виконується на основі відповіді API та логів. Код логування міститься у `backend/services/logger.service.ts`.
-
-7. **Додати підтвердження пароля при реєстрації**
+ **Додати підтвердження пароля при реєстрації**
    - Валідація на рівні сервісу: `backend/services/auth.service.ts`, метод `register()` перевіряє `password === passwordConfirm`.
    - DTO: `backend/dto/register.dto.ts` містить поле `passwordConfirm`.
 
@@ -163,7 +158,7 @@
    }
    ```
 
-8. **Додати роль користувача (admin/user)**
+**Додати роль користувача (admin/user)**
    - Модель: `backend/models/User.ts`, поле `role` з типом `"user" | "admin"`.
    - Підтримка ролі передається в JWT-пейлоуді в `backend/services/auth.service.ts`.
 
@@ -186,12 +181,12 @@
    }
    ```
 
-9. **Реалізувати logout**
+ **Реалізувати logout**
    - Контролер: `backend/controllers/auth.controller.ts`, `POST /auth/logout`
    - Сервіс: `backend/services/auth.service.ts`, метод `logout()` обнуляє `refreshToken` у базі.
 
    ```typescript
-   // backend/controllers/auth.controller.ts (фрагмент)
+   // backend/controllers/auth.controller.ts
    @UseGuards(JwtAuthGuard)
    @Post('logout')
    async logout(@Request() req) {
@@ -200,14 +195,14 @@
    ```
 
    ```typescript
-   // backend/services/auth.service.ts (фрагмент)
+   // backend/services/auth.service.ts
    async logout(userId: number): Promise<{ success: boolean }> {
      await this.userModel.update({ refreshToken: null }, { where: { id: userId } });
      return { success: true };
    }
    ```
 
-10. **Додати оновлення профілю**
+ **Додати оновлення профілю**
     - Контролер: `PUT /auth/profile` в `backend/controllers/auth.controller.ts`
     - Сервіс: `backend/services/auth.service.ts`, метод `updateProfile()`
     - DTO: `backend/dto/update-profile.dto.ts`
@@ -229,7 +224,7 @@
     }
     ```
 
-11. **Зберігати користувачів у базі**
+**Зберігати користувачів у базі**
     - Модель: `backend/models/User.ts`
     - Sequelize налаштований у `backend/app.module.ts`
     - Створення користувача у `backend/services/auth.service.ts`, метод `register()`
@@ -258,7 +253,7 @@
     }
     ```
 
-12. **Реалізувати refresh token**
+ **Реалізувати refresh token**
     - Контролер: `POST /auth/refresh` в `backend/controllers/auth.controller.ts`
     - Сервіс: `backend/services/auth.service.ts`, метод `refreshToken()`
     - Сховище: `refreshToken` хешується та зберігається в полі `refreshToken` моделі `User`
@@ -288,7 +283,7 @@
     }
     ```
 
-13. **Додати логування помилок**
+ **Додати логування помилок**
     - Сервіс: `backend/services/logger.service.ts`
     - Виклики логування в `backend/services/auth.service.ts` (`logInfo`, `logError`)
 
@@ -315,7 +310,7 @@
     }
     ```
 
-14. **Обмежити кількість спроб входу**
+ **Обмежити кількість спроб входу**
     - Сервіс: `backend/services/auth.service.ts`, метод `handleFailedLogin()` відстежує `loginAttempts` і встановлює `lockUntil` після 5 невдалих спроб.
     - Також у `backend/app.module.ts` підключено `ThrottlerModule`.
 
@@ -333,7 +328,7 @@
     }
     ```
 
-15. **Додати middleware для перевірки токена**
+**Додати middleware для перевірки токена**
     - Стратегія: `backend/strategies/jwt.strategy.ts`
     - Гард: `backend/guards/jwt-auth.guard.ts`
     - Роут-гард використовується у `backend/controllers/auth.controller.ts`
@@ -360,7 +355,7 @@
     }
     ```
 
-16. **Реалізувати зміну пароля**
+**Реалізувати зміну пароля**
     - Контролер: `PUT /auth/change-password` в `backend/controllers/auth.controller.ts`
     - Сервіс: `backend/services/auth.service.ts`, метод `changePassword()`
     - DTO: `backend/dto/update-password.dto.ts`
@@ -387,7 +382,7 @@
     }
     ```
 
-17. **Реалізувати видалення користувача**
+ **Реалізувати видалення користувача**
     - Контролер: `DELETE /auth/user` в `backend/controllers/auth.controller.ts`
     - Сервіс: `backend/services/auth.service.ts`, метод `deleteUser()`
 
@@ -408,7 +403,7 @@
     }
     ```
 
-18. **Реалізувати відновлення пароля**
+**Реалізувати відновлення пароля**
     - Контролер: `POST /auth/forgot-password`, `POST /auth/reset-password` в `backend/controllers/auth.controller.ts`
     - Сервіс: `backend/services/auth.service.ts`, методи `requestPasswordReset()` і `resetPassword()`
     - Пошта для скидання пароля: `sendPasswordResetEmail()` у `backend/services/auth.service.ts`
@@ -449,7 +444,7 @@
     }
     ```
 
-19. **Додати підтвердження email**
+**Додати підтвердження email**
     - Контролер: `GET /auth/confirm-email/:token` в `backend/controllers/auth.controller.ts`
     - Сервіс: `backend/services/auth.service.ts`, метод `confirmEmail()`
     - Пошта для підтвердження: `sendConfirmationEmail()` у `backend/services/auth.service.ts`
@@ -474,46 +469,6 @@
       }
     }
     ```
-
-20. **Реалізувати OAuth (Google login)**
-    - У репозиторії поки що немає реалізації OAuth/Google login.
-    - Коду `GoogleStrategy`, `passport-google-oauth20` або подібних файлів в `backend/` не знайдено.
-    - Сервіс: `backend/services/auth.service.ts`, метод `refreshToken()`
-    - Сховище: `refreshToken` хешується та зберігається в полі `refreshToken` моделі `User`
-
-21. **Додати логування помилок**
-    - Сервіс: `backend/services/logger.service.ts`
-    - Виклики логування в `backend/services/auth.service.ts` (`logInfo`, `logError`)
-
-22. **Обмежити кількість спроб входу**
-    - Сервіс: `backend/services/auth.service.ts`, метод `handleFailedLogin()` відстежує `loginAttempts` і встановлює `lockUntil` після 5 невдалих спроб.
-    - Також у `backend/app.module.ts` підключено `ThrottlerModule`.
-
-23. **Додати middleware для перевірки токена**
-    - Стратегія: `backend/strategies/jwt.strategy.ts`
-    - Гард: `backend/guards/jwt-auth.guard.ts`
-    - Роут-гард використовується у `backend/controllers/auth.controller.ts`
-
-24. **Реалізувати зміну пароля**
-    - Контролер: `PUT /auth/change-password` в `backend/controllers/auth.controller.ts`
-    - Сервіс: `backend/services/auth.service.ts`, метод `changePassword()`
-    - DTO: `backend/dto/update-password.dto.ts`
-
-25. **Реалізувати видалення користувача**
-    - Контролер: `DELETE /auth/user` в `backend/controllers/auth.controller.ts`
-    - Сервіс: `backend/services/auth.service.ts`, метод `deleteUser()`
-
-26. **Реалізувати відновлення пароля**
-    - Контролер: `POST /auth/forgot-password`, `POST /auth/reset-password` в `backend/controllers/auth.controller.ts`
-    - Сервіс: `backend/services/auth.service.ts`, методи `requestPasswordReset()` і `resetPassword()`
-    - Пошта для скидання пароля: `sendPasswordResetEmail()` у `backend/services/auth.service.ts`
-
-27. **Додати підтвердження email**
-    - Контролер: `GET /auth/confirm-email/:token` в `backend/controllers/auth.controller.ts`
-    - Сервіс: `backend/services/auth.service.ts`, метод `confirmEmail()`
-    - Пошта для підтвердження: `sendConfirmationEmail()` у `backend/services/auth.service.ts`
-
-
 
 ## Висновок
 
