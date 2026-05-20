@@ -6,44 +6,31 @@
 
 ---
 
-## 1. Створити REST API на Node.js та Express
 
+## 1. Ініціалізація проєкту
 
-Файли:
+Сервер створено у папці `backend` за допомогою NestJS поверх Express.
 
-- `backend/main.ts` — налаштування сервера та глобального префіксу `api`
-- `backend/app.module.ts` — імпорт модулів та підключення контролерів
-- `backend/controllers/auth.controller.ts` — маршрути авторизації та реєстрації
-- `backend/controllers/games.controller.ts` — маршрути для роботи з іграми
-- `backend/controllers/hardware.controller.ts` — маршрути для збереження та читання апаратного профілю
-- `backend/controllers/prediction.controller.ts` — маршрут прогнозу FPS
-
-Маршрути API:
-
-- `POST /api/auth/register`
-- `POST /api/auth/login`
-- `GET /api/games`
-- `GET /api/games/:id`
-- `POST /api/games`
-- `POST /api/hardware`
-- `GET /api/hardware/:userId`
-- `POST /api/predict/fps`
-
-**Приклад коду з `backend/main.ts`:**
+Файл: `backend/main.ts`
 
 ```typescript
 import { NestFactory } from "@nestjs/core";
 import { ValidationPipe } from "@nestjs/common";
 import { SwaggerModule, DocumentBuilder } from "@nestjs/swagger";
+import { NestExpressApplication } from "@nestjs/platform-express";
 import helmet from "helmet";
 import compression from "compression";
+import morgan from "morgan";
 import { AppModule } from "./app.module";
+import { LoggerService } from "./services/logger.service";
+import { AllExceptionsFilter } from "./filters/all-exceptions.filter";
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
   app.enableCors();
   app.use(helmet());
   app.use(compression());
+  app.use(morgan("combined"));
   app.setGlobalPrefix("api");
 
   app.useGlobalPipes(
@@ -54,6 +41,8 @@ async function bootstrap() {
       transformOptions: { enableImplicitConversion: true },
     }),
   );
+
+  app.useGlobalFilters(new AllExceptionsFilter(app.get(LoggerService)));
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle("Lab Adaptive API")
@@ -74,318 +63,423 @@ async function bootstrap() {
 bootstrap();
 ```
 
-**Приклад контролера з `backend/controllers/games.controller.ts`:**
+Файл: `backend/app.controller.ts`
 
 ```typescript
-@Controller("games")
-export class GamesController {
-  constructor(private gamesService: GamesService) {}
+import { Controller, Get } from "@nestjs/common";
 
+@Controller()
+export class AppController {
   @Get()
-  async getGames(
-    @Query("page") page: number = 1,
-    @Query("limit") limit: number = 10,
-  ) {
-    return this.gamesService.getGames(page, limit);
-  }
-
-  @Get(":id")
-  async getGame(@Param("id") id: string) {
-    return this.gamesService.getGameById(+id);
-  }
-
-  @Post()
-  async createGame(@Body() createGameDto: CreateGameDto) {
-    return this.gamesService.createGame(createGameDto);
+  getHello() {
+    return {
+      message: "Hello World!",
+      api: "/api",
+      docs: "/api/docs",
+    };
   }
 }
 ```
 
----
+Кореневий маршрут `/` повертає JSON відповідь.
 
-## 2. Реалізувати захист API
+## 2. Логування HTTP-запитів
 
-### Helmet
+HTTP-запити логуються в консоль через Morgan.
 
-Реалізація:
-
-- `backend/main.ts`
-  - `app.use(helmet())`
-  - `app.use(compression())`
-
-**Код з `backend/main.ts`:**
+Файл: `backend/main.ts`
 
 ```typescript
-import helmet from "helmet";
-import compression from "compression";
-
-async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-  app.enableCors();
-  app.use(helmet());
-  app.use(compression());
-  // ...
-}
+app.use(morgan("combined"));
 ```
 
-### Rate-limit
+## 3. Файлове логування подій
 
-Реалізація:
+Winston логер записує повідомлення у файл `logs/app.log` та виводить у консоль.
 
-- `backend/app.module.ts`
-  - `ThrottlerModule.forRoot({ throttlers: [{ limit: 10, ttl: 60 }] })`
-- `backend/app.module.ts`
-  - глобальний `APP_GUARD` з `ThrottlerGuard`
-
-**Код з `backend/app.module.ts`:**
+Файл: `backend/services/logger.service.ts`
 
 ```typescript
-import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
-import { APP_GUARD } from "@nestjs/core";
+import { Injectable, LoggerService as NestLoggerService } from "@nestjs/common";
+import { createLogger, format, transports } from "winston";
+import * as fs from "fs";
+import * as path from "path";
 
-@Module({
-  imports: [
-    // ...
-    ThrottlerModule.forRoot({
-      throttlers: [
-        {
-          limit: 10,
-          ttl: 60,
-        },
+@Injectable()
+export class LoggerService implements NestLoggerService {
+  private readonly logFile = path.join(process.cwd(), "logs", "app.log");
+  private readonly logger;
+
+  constructor() {
+    const logsDir = path.dirname(this.logFile);
+    if (!fs.existsSync(logsDir)) {
+      fs.mkdirSync(logsDir, { recursive: true });
+    }
+
+    this.logger = createLogger({
+      level: "info",
+      format: format.combine(
+        format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
+        format.printf(({ timestamp, level, message, stack }) => {
+          return `${timestamp} ${level.toUpperCase()}: ${message}${stack ? `\n${stack}` : ""}`;
+        }),
+      ),
+      transports: [
+        new transports.Console(),
+        new transports.File({ filename: this.logFile, level: "info" }),
       ],
-    }),
-    // ...
-  ],
-  providers: [
-    // ...
-    {
-      provide: APP_GUARD,
-      useClass: ThrottlerGuard,
-    },
-    // ...
-  ],
-})
-export class AppModule {}
-```
+    });
+  }
 
-### Валідація даних
+  log(message: string) {
+    this.logger.info(message);
+  }
 
-Реалізація:
+  error(message: string, trace?: string) {
+    this.logger.error(message, { stack: trace });
+  }
 
-- `backend/main.ts`
-  - глобальний `ValidationPipe`
-- DTO класи в `backend/dto/`
-  - `backend/dto/register.dto.ts`
-  - `backend/dto/login.dto.ts`
-  - `backend/dto/update-password.dto.ts`
-  - `backend/dto/update-profile.dto.ts`
+  warn(message: string) {
+    this.logger.warn(message);
+  }
 
+  debug(message: string) {
+    this.logger.debug(message);
+  }
 
-**Код з `backend/main.ts`:**
+  verbose(message: string) {
+    this.logger.verbose(message);
+  }
 
-```typescript
-import { ValidationPipe } from "@nestjs/common";
+  logInfo(message: string) {
+    this.log(message);
+  }
 
-async function bootstrap() {
-  // ...
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-      transformOptions: { enableImplicitConversion: true },
-    }),
-  );
-  // ...
+  logError(message: string, error?: any) {
+    this.error(message, error instanceof Error ? error.stack : String(error));
+  }
 }
 ```
 
-**Приклад DTO з `backend/dto/register.dto.ts`:**
+## 4. Обробка помилок
+
+Глобальний фільтр перехоплює помилки, логувує їх через Winston та повертає JSON відповідь.
+
+Файл: `backend/filters/all-exceptions.filter.ts`
 
 ```typescript
 import {
-  IsEmail,
-  IsNotEmpty,
-  IsString,
-  MinLength,
-  Matches,
-} from "class-validator";
+  ArgumentsHost,
+  Catch,
+  ExceptionFilter,
+  HttpException,
+  HttpStatus,
+} from "@nestjs/common";
+import { Request, Response } from "express";
+import { LoggerService } from "../services/logger.service";
 
-export class RegisterDto {
-  @IsNotEmpty({ message: "Ім'я обов'язкове" })
-  @IsString()
-  name: string;
+@Catch()
+export class AllExceptionsFilter implements ExceptionFilter {
+  constructor(private readonly logger: LoggerService) {}
 
-  @IsEmail({}, { message: "Невірний email" })
-  @IsNotEmpty({ message: "Email обов'язковий" })
-  email: string;
+  catch(exception: unknown, host: ArgumentsHost) {
+    const ctx = host.switchToHttp();
+    const response = ctx.getResponse<Response>();
+    const request = ctx.getRequest<Request>();
 
-  @IsNotEmpty({ message: "Пароль обов'язковий" })
-  @MinLength(6, { message: "Пароль повинен містити мінімум 6 символів" })
-  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, {
-    message: "Пароль повинен містити велику літеру, малу літеру та цифру",
-  })
-  password: string;
+    const status =
+      exception instanceof HttpException
+        ? exception.getStatus()
+        : HttpStatus.INTERNAL_SERVER_ERROR;
 
-  @IsNotEmpty({ message: "Підтвердження пароля обов'язкове" })
-  passwordConfirm: string;
+    const errorResponse =
+      exception instanceof HttpException
+        ? exception.getResponse()
+        : "Internal server error";
+
+    const errorMessage =
+      exception instanceof Error ? exception.stack : JSON.stringify(exception);
+
+    this.logger.logError(
+      `HTTP ${request.method} ${request.url} ${status}`,
+      errorMessage,
+    );
+
+    response.status(status).json({
+      statusCode: status,
+      timestamp: new Date().toISOString(),
+      path: request.url,
+      error: errorResponse,
+    });
+  }
 }
 ```
 
----
-
-## 3. Реалізувати кешування відповідей
-
-Реалізація кешування:
-
-- `backend/app.module.ts`
-  - підключено `CacheModule.registerAsync(...)`
-  - автоконфігурація Redis за `REDIS_URL` або локальний кеш
-  - глобальний `APP_INTERCEPTOR` з `CacheInterceptor`
-- Власне використання кешу в контролерах:
-  - `backend/controllers/games.controller.ts`
-    - кешування результатів `GET /api/games`
-    - кешування `GET /api/games/:id`
-  - `backend/controllers/hardware.controller.ts`
-    - кешування `GET /api/hardware/:userId`
-
-При створенні/оновленні/видаленні ігор кеш очищається за допомогою `this.cacheManager.clear()`.
-
-**Код з `backend/app.module.ts`:**
+Інтеграція у `backend/main.ts`:
 
 ```typescript
-import { CacheModule, CacheInterceptor } from "@nestjs/cache-manager";
-import { APP_INTERCEPTOR } from "@nestjs/core";
+app.useGlobalFilters(new AllExceptionsFilter(app.get(LoggerService)));
+```
+
+## 5. Завантаження одного файлу
+
+Ендпоінт `/upload` реалізовано одним файлом через `FileInterceptor`.
+
+Файл: `backend/controllers/upload.controller.ts`
+
+```typescript
+import {
+  BadRequestException,
+  Controller,
+  Post,
+  UploadedFile,
+  UseInterceptors,
+} from "@nestjs/common";
+import {
+  ApiBody,
+  ApiConsumes,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from "@nestjs/swagger";
+import { FileInterceptor } from "@nestjs/platform-express";
+import { diskStorage } from "multer";
+import * as fs from "fs";
+import * as path from "path";
+
+const UPLOAD_DIR = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(UPLOAD_DIR)) {
+  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+}
+
+const storage = diskStorage({
+  destination: UPLOAD_DIR,
+  filename: (_req, file, callback) => {
+    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    callback(null, `${uniqueSuffix}-${file.originalname}`);
+  },
+});
+
+const fileFilter = (_req, file, callback) => {
+  const allowedMimeTypes = ["image/jpeg", "image/png", "application/pdf"];
+  if (!allowedMimeTypes.includes(file.mimetype)) {
+    return callback(
+      new BadRequestException("Дозволені типи файлів: jpg, png, pdf"),
+      false,
+    );
+  }
+  callback(null, true);
+};
+
+const uploadOptions = {
+  storage,
+  fileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024,
+  },
+};
+
+@ApiTags("upload")
+@Controller("upload")
+export class UploadController {
+  @Post()
+  @ApiOperation({ summary: "Upload a single file" })
+  @ApiConsumes("multipart/form-data")
+  @ApiBody({
+    schema: {
+      type: "object",
+      properties: {
+        file: { type: "string", format: "binary" },
+      },
+    },
+  })
+  @ApiResponse({ status: 201, description: "File uploaded." })
+  @UseInterceptors(FileInterceptor("file", uploadOptions))
+  uploadFile(@UploadedFile() file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException("Файл не завантажено");
+    }
+    return {
+      filename: file.filename,
+      originalName: file.originalname,
+      path: file.path,
+      size: file.size,
+      mimetype: file.mimetype,
+    };
+  }
+}
+```
+
+## 6. Завантаження кількох файлів
+
+Підтримка множинного завантаження додана у тому ж контролері.
+
+```typescript
+import { FilesInterceptor } from "@nestjs/platform-express";
+
+  @Post("/multiple")
+  @ApiOperation({ summary: "Upload multiple files" })
+  @ApiConsumes("multipart/form-data")
+  @ApiBody({
+    schema: {
+      type: "object",
+      properties: {
+        files: {
+          type: "array",
+          items: { type: "string", format: "binary" },
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 201, description: "Files uploaded." })
+  @UseInterceptors(FilesInterceptor("files", 10, uploadOptions))
+  uploadMultiple(@UploadedFiles() files: Express.Multer.File[]) {
+    if (!files || files.length === 0) {
+      throw new BadRequestException("Файли не завантажено");
+    }
+    return files.map((file) => ({
+      filename: file.filename,
+      originalName: file.originalname,
+      path: file.path,
+      size: file.size,
+      mimetype: file.mimetype,
+    }));
+  }
+```
+
+## 7. Валідація файлів
+
+Перевірка MIME-типу та обмеження розміру реалізовані в `uploadOptions`.
+
+```typescript
+const allowedMimeTypes = ["image/jpeg", "image/png", "application/pdf"];
+
+const uploadOptions = {
+  storage,
+  fileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024,
+  },
+};
+```
+
+Це забезпечує:
+
+- дозволені типи файлів: `jpg`, `png`, `pdf`
+- макс. розмір одного файлу 5 МБ
+- збереження у папку `uploads`
+
+## 8. Моніторинг стану сервера
+
+Ендпоінт `/status` повертає uptime і пам’ять.
+
+Файл: `backend/controllers/system.controller.ts`
+
+```typescript
+import { Controller, Get } from "@nestjs/common";
+import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+
+@ApiTags("system")
+@Controller()
+export class SystemController {
+  @Get("status")
+  @ApiOperation({ summary: "Get server status" })
+  @ApiResponse({ status: 200, description: "Server status returned." })
+  getStatus() {
+    return {
+      uptime: process.uptime(),
+      memoryUsage: process.memoryUsage(),
+      timestamp: new Date().toISOString(),
+    };
+  }
+}
+```
+
+## 9. Вимірювання часу відповіді
+
+Middleware `ResponseTimeMiddleware` обчислює час запиту і логує його.
+
+Файл: `backend/middleware/response-time.middleware.ts`
+
+```typescript
+import { Injectable, NestMiddleware } from "@nestjs/common";
+import { NextFunction, Request, Response } from "express";
+import { LoggerService } from "../services/logger.service";
+
+@Injectable()
+export class ResponseTimeMiddleware implements NestMiddleware {
+  constructor(private readonly logger: LoggerService) {}
+
+  use(req: Request, res: Response, next: NextFunction) {
+    const start = Date.now();
+    res.on("finish", () => {
+      const duration = Date.now() - start;
+      this.logger.logInfo(
+        `Request ${req.method} ${req.originalUrl} completed in ${duration}ms`,
+      );
+    });
+    next();
+  }
+}
+```
+
+Реєстрація в `backend/app.module.ts`:
+
+```typescript
+import { Module, MiddlewareConsumer, NestModule } from "@nestjs/common";
+import { ResponseTimeMiddleware } from "./middleware/response-time.middleware";
 
 @Module({
-  imports: [
-    // ...
-    CacheModule.registerAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: async (config: ConfigService) => {
-        const redisUrl = config.get<string>("REDIS_URL");
-        if (redisUrl) {
-          const redisStore = await import("cache-manager-ioredis");
-          return {
-            store: redisStore.default || redisStore,
-            url: redisUrl,
-            ttl: 120,
-          } as any;
-        }
-        return {
-          ttl: 60,
-          max: 100,
-        };
-      },
-    }),
-    // ...
-  ],
-  providers: [
-    // ...
-    {
-      provide: APP_INTERCEPTOR,
-      useClass: CacheInterceptor,
-    },
-    // ...
-  ],
+  // ...
 })
-export class AppModule {}
-```
-
-**Код з `backend/controllers/games.controller.ts`:**
-
-```typescript
-import { CacheManager } from "@nestjs/cache-manager";
-
-@Controller("games")
-export class GamesController {
-  constructor(
-    private gamesService: GamesService,
-    private cacheManager: CacheManager,
-  ) {}
-
-  @Get()
-  async getGames(
-    @Query("page") page: number = 1,
-    @Query("limit") limit: number = 10,
-  ) {
-    return this.gamesService.getGames(page, limit);
-  }
-
-  @Post()
-  async createGame(@Body() createGameDto: CreateGameDto) {
-    const result = await this.gamesService.createGame(createGameDto);
-    await this.cacheManager.clear();
-    return result;
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(ResponseTimeMiddleware).forRoutes("*");
   }
 }
 ```
 
----
+## 10. Інтеграція менеджера процесів
 
-## 4. Оптимізувати один із маршрутів API
+PM2 конфігурація для запуску NestJS-застосунку.
 
-Оптимізовано маршрут `GET /api/games` у `backend/controllers/games.controller.ts`.
+Файл: `backend/ecosystem.config.js`
 
-Оптимізації:
+```js
+module.exports = {
+  apps: [
+    {
+      name: "lab-adaptive-backend",
+      script: "pnpm",
+      args: "exec ts-node main.ts",
+      cwd: __dirname,
+      env: {
+        NODE_ENV: "production",
+      },
+    },
+  ],
+};
+```
 
-- Підтримка пагінації: `page` + `limit`
-- Обмеження `limit` на максимум `50`
-- Використання `findAndCountAll` для отримання сторінкових даних та загальної кількості
-- Кешування відповіді на 120 секунд за ключем `games:page=X&limit=Y`
+Скрипти у `backend/package.json`:
 
-Це знижує навантаження на базу даних при повторних запитах і дозволяє обробляти великі набори даних ефективніше.
+```json
+"scripts": {
+  "pm2:start": "pm2 start ecosystem.config.js",
+  "pm2:restart": "pm2 restart lab-adaptive-backend",
+  "pm2:stop": "pm2 stop lab-adaptive-backend",
+  "pm2:logs": "pm2 logs lab-adaptive-backend"
+}
+```
 
----
+Для перевірки:
 
-## 5. Провести тестування API
-
-
-- `backend/test/app.e2e-spec.ts`
-
-Тести:
-
-- `GET /api/games` повертає 200 і JSON
-- `POST /api/games` створює нову гру
-- `GET /api/games/:id` повертає створену гру
-
-Скрипт запуску тестів:
-
-- `backend/package.json`
-  - `test: "jest --runInBand"`
-
----
-
-## 6. Проаналізувати продуктивність до та після оптимізації
-
-Підготовлено інструмент для навантажувального тестування.
-
-Файл:
-
-- `backend/artillery.yaml`
-
-Конфігурація:
-
-- `target: "http://localhost:3000/api"`
-- 30 секунд, 5 запитів на секунду
-- сценарій: `GET /games?page=1&limit=10` та `POST /games`
-
-Запуск:
-
-- `cd backend && npx artillery run artillery.yaml`
+- `pnpm --filter backend exec pm2 start ecosystem.config.js`
+- `pnpm --filter backend exec pm2 logs lab-adaptive-backend`
+- `pnpm --filter backend exec pm2 restart lab-adaptive-backend`
 
 ---
 
-## Висновок
 
-У цьому проєкті всі основні вимоги виконані через NestJS бекенд:
-
-- безпечний REST API з `helmet` і `rate-limit`
-- валідація DTO
-- кешування відповідей
-- оптимізований маршрут `GET /api/games`
-- e2e-тести через Jest/Supertest
-- готовий сценарій для аналізу продуктивності
 
 
